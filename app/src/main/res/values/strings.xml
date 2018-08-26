@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">Intdv_task</string>
+    <string name="app_name">My Addresses</string>
+    <string name="something_wrong">Something went wrong try again</string>
 </resources>
