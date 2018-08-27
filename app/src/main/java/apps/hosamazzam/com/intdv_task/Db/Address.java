@@ -7,9 +7,9 @@ import android.support.annotation.NonNull;
 
 @Entity(tableName = "addresses")
 public class Address {
-    @PrimaryKey
+    @PrimaryKey(autoGenerate = true)
     @NonNull
-    private String id;
+    private int id;
 
     @ColumnInfo(name = "uid")
     private String user_id;
@@ -26,11 +26,11 @@ public class Address {
     @ColumnInfo(name = "lng")
     private double lng;
 
-    public String getId() {
+    public int getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(int id) {
         this.id = id;
     }
 

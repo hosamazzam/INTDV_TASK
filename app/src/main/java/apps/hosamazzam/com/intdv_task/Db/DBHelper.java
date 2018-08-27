@@ -11,7 +11,7 @@ public class DBHelper {
                 AppDatabase.class, "my-addresses").build();
     }
 
-    public AppDatabase getInstance(Context context) {
+    public static AppDatabase getInstance(Context context) {
         if (appDatabase == null) {
             new DBHelper(context);
         }

@@ -5,6 +5,8 @@ import android.annotation.SuppressLint;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
@@ -15,6 +17,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
 import android.widget.Toast;
 
 import com.google.android.gms.common.api.ApiException;
@@ -28,20 +31,27 @@ import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.SettingsClient;
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.UiSettings;
+import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import apps.hosamazzam.com.intdv_task.R;
 
 public class MapActivity extends AppCompatActivity implements OnMapReadyCallback {
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 970;
-    public static GoogleMap mMap;
+    private static GoogleMap mMap;
     private SupportMapFragment mapFragment;
+    public View locationButton;
 
     private FusedLocationProviderClient mFusedLocationProviderClient;
     private LocationRequest mLocationRequest;
@@ -53,7 +63,20 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             if (result == null) return;
             mCurrentLocation = result.getLocations().get(0);
             System.out.println("location ok : " + mCurrentLocation.getLatitude() + " " + mCurrentLocation.getLongitude());
+            Toast.makeText(MapActivity.this, "location detected", Toast.LENGTH_SHORT).show();
+            LatLng latLng = new LatLng(mCurrentLocation.getLatitude(),
+                    mCurrentLocation.getLongitude());
+            if (mMap != null) {
+                mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+                mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
+                System.out.println("map not null : " + mCurrentLocation.getLatitude() + " " + mCurrentLocation.getLongitude());
+                if (locationButton != null) {
+                    System.out.println("location button not null");
+                    locationButton.performClick();
+                }
+            }
             mFusedLocationProviderClient.removeLocationUpdates(mLocationCallback);
+
         }
 
         @Override
@@ -68,6 +91,8 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         mapFragment =
                 (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+        locationButton = ((View) mapFragment.getView().findViewById(Integer.parseInt("1")).getParent()).findViewById(Integer.parseInt("2"));
+
         checkPermision();
 
     }
@@ -128,6 +153,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                         System.out.println("Permission denied");
                         return;
                     }
+                    Toast.makeText(MapActivity.this, "Finding your location", Toast.LENGTH_LONG).show();
                     mFusedLocationProviderClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
                 }
             });
@@ -159,7 +185,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             e.printStackTrace();
         }
     }
-
 
     private void checkProvider() {
         LocationManager locateManager = (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -240,9 +265,24 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         uiSettings.setMapToolbarEnabled(false);
         uiSettings.setMyLocationButtonEnabled(true);
         uiSettings.setAllGesturesEnabled(true);
-        uiSettings.setZoomControlsEnabled(false);
+        uiSettings.setZoomControlsEnabled(true);
         uiSettings.setCompassEnabled(false);
 
+        onMapReadyListener.onReady(mMap);
+    }
+
+    public Address getAddress(double lat, double lng) {
+        Geocoder geocoder = new Geocoder(this);
+        List<Address> list = new ArrayList<>();
+        try {
+            list = geocoder.getFromLocation(lat, lng, 1);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (list.size() > 0) {
+            return list.get(0);
+        }
+        return null;
     }
 
     public interface onMapReadyListener {
