@@ -2,4 +2,8 @@
     <string name="app_name">My Addresses</string>
     <string name="something_wrong">Something went wrong try again</string>
     <string name="google_maps_key">AIzaSyA9xazu_I7n-bHbtpHdjXMa85CgvI1rhYw</string>
+
+    <string-array name="address_list">
+        <item>No Address saved yet!</item>
+    </string-array>
 </resources>
