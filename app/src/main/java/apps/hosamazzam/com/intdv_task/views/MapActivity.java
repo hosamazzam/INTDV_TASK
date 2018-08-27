@@ -10,17 +10,29 @@ import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Looper;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
+import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationAvailability;
 import com.google.android.gms.location.LocationCallback;
@@ -31,12 +43,16 @@ import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.SettingsClient;
+import com.google.android.gms.location.places.AutocompleteFilter;
+import com.google.android.gms.location.places.PlaceBuffer;
+import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -46,12 +62,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 import apps.hosamazzam.com.intdv_task.R;
+import apps.hosamazzam.com.intdv_task.adapters.PlaceAutocompleteAdapter;
+import apps.hosamazzam.com.intdv_task.helpers.Utility;
 
-public class MapActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class MapActivity extends AppCompatActivity implements OnMapReadyCallback, PlaceAutocompleteAdapter.PlaceAutoCompleteInterface, GoogleApiClient.OnConnectionFailedListener,
+        GoogleApiClient.ConnectionCallbacks, View.OnClickListener {
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 970;
     private static GoogleMap mMap;
     private SupportMapFragment mapFragment;
     public View locationButton;
+
+    private static final LatLngBounds BOUNDS_Egypt = new LatLngBounds(
+            new LatLng(22.006347, 25.010315), new LatLng(31.322526, 34.219822));
+    GoogleApiClient mGoogleApiClient;
+    LinearLayoutManager llm;
+    PlaceAutocompleteAdapter mAdapter;
+    EditText mSearchEdittext;
+    ImageView mClear;
+    private RecyclerView mRecyclerView;
+
 
     private FusedLocationProviderClient mFusedLocationProviderClient;
     private LocationRequest mLocationRequest;
@@ -85,15 +114,89 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     };
     private onMapReadyListener onMapReadyListener;
+    private onPlaceReadyListener onPlaceReadyListener;
 
     public void registerMapReadyListener(onMapReadyListener listener) {
         onMapReadyListener = listener;
+
+
         mapFragment =
                 (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
         locationButton = ((View) mapFragment.getView().findViewById(Integer.parseInt("1")).getParent()).findViewById(Integer.parseInt("2"));
+        RelativeLayout.LayoutParams rlp = (RelativeLayout.LayoutParams) locationButton.getLayoutParams();
+        rlp.addRule(RelativeLayout.ALIGN_PARENT_TOP, 0);
+        rlp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM, RelativeLayout.TRUE);
+        rlp.setMargins(0, 0, 30, Utility.pxFromDp(MapActivity.this, 30));
+        locationButton.setLayoutParams(rlp);
 
         checkPermision();
+    }
+
+    public void registerPlaceReadyListener(onPlaceReadyListener listener) {
+        onPlaceReadyListener = listener;
+        initSearch();
+    }
+
+    private void initSearch() {
+        mRecyclerView = findViewById(R.id.list_search);
+        mRecyclerView.setHasFixedSize(true);
+        llm = new LinearLayoutManager(this);
+        mRecyclerView.setLayoutManager(llm);
+        mRecyclerView.setNestedScrollingEnabled(false);
+
+        mSearchEdittext = findViewById(R.id.search_et);
+        mClear = findViewById(R.id.search_clear);
+        mClear.setOnClickListener(this);
+
+
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .enableAutoManage(this, 0 /* clientId */, this)
+                .addApi(Places.GEO_DATA_API)
+                .build();
+        AutocompleteFilter typeFilter = new AutocompleteFilter.Builder()
+                .setCountry("EG")
+                .build();
+
+        mAdapter = new PlaceAutocompleteAdapter(this, R.layout.view_placesearch,
+                mGoogleApiClient, BOUNDS_Egypt, typeFilter);
+        mRecyclerView.setAdapter(mAdapter);
+
+        mSearchEdittext.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (count > 0) {
+                    mRecyclerView.setVisibility(View.VISIBLE);
+                    mClear.setVisibility(View.VISIBLE);
+                    if (mAdapter != null) {
+                        mRecyclerView.setAdapter(mAdapter);
+                    }
+                } else {
+                    mRecyclerView.setVisibility(View.GONE);
+                    mClear.setVisibility(View.GONE);
+                    //     if (mSavedAdapter != null && mSavedAddressList.size() > 0) {
+                    //       mRecyclerView.setAdapter(mSavedAdapter);
+                    //    }
+                }
+                if (!s.toString().equals("") && mGoogleApiClient.isConnected()) {
+                    mAdapter.getFilter().filter(s.toString());
+                } else if (!mGoogleApiClient.isConnected()) {
+//                    Toast.makeText(getApplicationContext(), Constants.API_NOT_CONNECTED, Toast.LENGTH_SHORT).show();
+                    Log.e("", "NOT CONNECTED");
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+
+            }
+        });
+
 
     }
 
@@ -265,11 +368,76 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         uiSettings.setMapToolbarEnabled(false);
         uiSettings.setMyLocationButtonEnabled(true);
         uiSettings.setAllGesturesEnabled(true);
-        uiSettings.setZoomControlsEnabled(true);
+        uiSettings.setZoomControlsEnabled(false);
         uiSettings.setCompassEnabled(false);
 
         onMapReadyListener.onReady(mMap);
     }
+
+
+    @Override
+    public void onConnected(Bundle bundle) {
+
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+
+    }
+
+
+    @Override
+    public void onClick(View v) {
+        if (v == mClear) {
+            mSearchEdittext.setText("");
+            if (mAdapter != null) {
+                mAdapter.clearList();
+            }
+
+        }
+    }
+
+
+    @Override
+    public void onPlaceClick(ArrayList<PlaceAutocompleteAdapter.PlaceAutocomplete> mResultList, int position) {
+        if (mResultList != null) {
+            try {
+                final String placeId = String.valueOf(mResultList.get(position).placeId);
+                        /*
+                             Issue a request to the Places Geo Data API to retrieve a Place object with additional details about the place.
+                         */
+
+                PendingResult<PlaceBuffer> placeResult = Places.GeoDataApi
+                        .getPlaceById(mGoogleApiClient, placeId);
+                placeResult.setResultCallback(new ResultCallback<PlaceBuffer>() {
+                    @Override
+                    public void onResult(PlaceBuffer places) {
+                        if (places.getCount() == 1) {
+                            //Do the things here on Click.....
+                            apps.hosamazzam.com.intdv_task.Db.Address address = new apps.hosamazzam.com.intdv_task.Db.Address();
+                            address.setName(String.valueOf(places.get(0).getName()));
+                            address.setDesc(String.valueOf(places.get(0).getAddress()));
+                            address.setLng(places.get(0).getLatLng().longitude);
+                            address.setLat(places.get(0).getLatLng().latitude);
+                            onPlaceReadyListener.onPlaceClick(address);
+                            mSearchEdittext.setText("");
+                        } else {
+                            Toast.makeText(getApplicationContext(), "something went wrong", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+            } catch (Exception e) {
+
+            }
+
+        }
+    }
+
 
     public Address getAddress(double lat, double lng) {
         Geocoder geocoder = new Geocoder(this);
@@ -285,8 +453,25 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         return null;
     }
 
+    @Override
+    public void onStart() {
+        mGoogleApiClient.connect();
+        super.onStart();
+
+    }
+
+    @Override
+    public void onStop() {
+        mGoogleApiClient.disconnect();
+        super.onStop();
+    }
+
     public interface onMapReadyListener {
         void onReady(GoogleMap googleMap);
+    }
+
+    public interface onPlaceReadyListener {
+        void onPlaceClick(apps.hosamazzam.com.intdv_task.Db.Address address);
     }
 
 }

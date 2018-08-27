@@ -33,7 +33,7 @@ import apps.hosamazzam.com.intdv_task.helpers.IntentHelper;
 import apps.hosamazzam.com.intdv_task.helpers.Utility;
 import apps.hosamazzam.com.intdv_task.views.MapActivity;
 
-public class HomeActivity extends MapActivity implements MapActivity.onMapReadyListener {
+public class HomeActivity extends MapActivity implements MapActivity.onMapReadyListener, MapActivity.onPlaceReadyListener {
     private Marker mMarker;
     private Address mCurrentAddress;
     List<apps.hosamazzam.com.intdv_task.Db.Address> mAddressList;
@@ -56,6 +56,8 @@ public class HomeActivity extends MapActivity implements MapActivity.onMapReadyL
 
     public void initView() {
         registerMapReadyListener(this);
+        registerPlaceReadyListener(this);
+
         mLogout = findViewById(R.id.logout);
         mClear = findViewById(R.id.clear);
         mSave = findViewById(R.id.save);
@@ -241,4 +243,16 @@ public class HomeActivity extends MapActivity implements MapActivity.onMapReadyL
     }
 
 
+    @Override
+    public void onPlaceClick(apps.hosamazzam.com.intdv_task.Db.Address address) {
+        if (mMarker != null) {
+            mMarker.remove();
+        }
+        mCurrentAddress = getAddress(address.getLat(), address.getLng());
+        LatLng point = new LatLng(address.getLat(), address.getLng());
+
+        if (mCurrentAddress != null) {
+            createMarker(point, mCurrentAddress.getFeatureName(), mCurrentAddress.getAddressLine(0));
+        }
+    }
 }
